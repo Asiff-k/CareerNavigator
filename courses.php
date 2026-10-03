@@ -1,0 +1,144 @@
+<?php
+require_once 'includes/init.php';
+require_once 'includes/recommendation.php';
+require_role('student', 'advisor', 'admin');
+
+$q = trim($_GET['q'] ?? '');
+$skillFilter = input_int($_GET, 'skill_id');
+$careerFilter = input_int($_GET, 'career_id');
+
+// Build the search query with only the filters that were used.
+$where = [];
+$params = [];
+if ($q !== '') {
+    $where[] = "(c.title LIKE ? OR c.provider LIKE ? OR c.description LIKE ?)";
+    $like = '%' . $q . '%';
+    array_push($params, $like, $like, $like);
+}
+if ($skillFilter) {
+    $where[] = "c.skill_id = ?";
+    $params[] = $skillFilter;
+}
+if ($careerFilter) {
+    $where[] = "c.id IN (SELECT course_id FROM career_courses WHERE career_id = ?)";
+    $params[] = $careerFilter;
+}
+
+$sql = "SELECT c.*, s.name AS skill_name,
+               GROUP_CONCAT(DISTINCT ca.title ORDER BY ca.title SEPARATOR ', ') AS career_titles
+        FROM courses c
+        LEFT JOIN skills s ON s.id = c.skill_id
+        LEFT JOIN career_courses cc ON cc.course_id = c.id
+        LEFT JOIN careers ca ON ca.id = cc.career_id"
+    . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
+    . " GROUP BY c.id ORDER BY c.title";
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$skills = $pdo->query("SELECT id, name FROM skills ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$careerList = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
+
+// Students also get personal suggestions based on the skill gaps of their top 3 careers.
+$recommended = [];
+$gapSkillIds = [];
+if (current_user()['role'] === 'student') {
+    foreach (array_slice(get_recommendations($pdo, current_user_id()), 0, 3) as $r) {
+        foreach ($r['skills'] as $s) {
+            if ($s['status'] !== 'met') {
+                $gapSkillIds[$s['skill_id']] = true;
+            }
+        }
+    }
+    foreach (courses_for_skills($pdo, array_keys($gapSkillIds)) as $list) {
+        $recommended[] = $list[0]; // one course per missing skill
+    }
+    $recommended = array_slice($recommended, 0, 6);
+}
+
+$pageTitle = 'Courses & Certifications';
+$activePage = 'courses';
+require 'includes/header.php';
+?>
+
+<div class="page-header">
+    <div>
+        <h1>Courses &amp; Certifications</h1>
+        <p>Learning resources mapped to the skills and careers in CareerNavigator.</p>
+    </div>
+</div>
+
+<?php if ($recommended && !$q && !$skillFilter && !$careerFilter): ?>
+    <div class="card">
+        <h2>Recommended for you</h2>
+        <p class="muted">Based on missing or weak skills for your top 3 career matches.</p>
+        <div class="grid grid-3">
+            <?php foreach ($recommended as $c): ?>
+                <div class="match course-card" style="margin:0">
+                    <strong><?= e($c['title']) ?></strong>
+                    <p class="small muted"><?= e($c['provider']) ?></p>
+                    <a href="<?= e($c['course_url']) ?>" target="_blank" rel="noopener" class="btn btn-primary btn-sm">Open course ↗</a>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+<?php endif; ?>
+
+<form method="GET" class="filters card">
+    <div class="form-group">
+        <label for="q">Search</label>
+        <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Title, provider or keyword">
+    </div>
+    <div class="form-group">
+        <label for="skill_id">Skill</label>
+        <select id="skill_id" name="skill_id">
+            <option value="">All skills</option>
+            <?php foreach ($skills as $s): ?>
+                <option value="<?= (int) $s['id'] ?>" <?= $skillFilter === (int) $s['id'] ? 'selected' : '' ?>><?= e($s['name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="career_id">Career</label>
+        <select id="career_id" name="career_id">
+            <option value="">All careers</option>
+            <?php foreach ($careerList as $c): ?>
+                <option value="<?= (int) $c['id'] ?>" <?= $careerFilter === (int) $c['id'] ? 'selected' : '' ?>><?= e($c['title']) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="btn-group">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="courses.php" class="btn btn-secondary">Reset</a>
+    </div>
+</form>
+
+<p class="muted mb"><?= count($courses) ?> course(s) found.</p>
+
+<?php if (!$courses): ?>
+    <div class="card empty">No courses match your filters.</div>
+<?php endif; ?>
+
+<div class="grid grid-3">
+    <?php foreach ($courses as $c): ?>
+        <div class="card course-card">
+            <div class="course-meta">
+                <?php if ($c['skill_name']): ?>
+                    <span class="badge <?= isset($gapSkillIds[$c['skill_id']]) ? 'badge-amber' : 'badge-green' ?>"><?= e($c['skill_name']) ?></span>
+                <?php endif; ?>
+                <?php if (isset($gapSkillIds[$c['skill_id']])): ?><span class="badge badge-dark">Fills a skill gap</span><?php endif; ?>
+            </div>
+            <h3><?= e($c['title']) ?></h3>
+            <div class="small muted mb"><?= e($c['provider']) ?></div>
+            <p class="small"><?= e($c['description']) ?></p>
+            <?php if ($c['career_titles']): ?>
+                <p class="small muted">Useful for: <?= e($c['career_titles']) ?></p>
+            <?php endif; ?>
+            <?php if ($c['course_url']): ?>
+                <a href="<?= e($c['course_url']) ?>" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">Open course ↗</a>
+            <?php endif; ?>
+        </div>
+    <?php endforeach; ?>
+</div>
+
+<?php require 'includes/footer.php'; ?>
