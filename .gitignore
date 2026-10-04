@@ -5,3 +5,10 @@ Thumbs.db
 desktop.ini
 .DS_Store
 *.log
+
+# Composer packages (run "composer install")
+vendor/
+
+# Local secrets (SMTP credentials)
+config/mail.local.php
+.env

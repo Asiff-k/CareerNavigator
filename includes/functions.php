@@ -1,15 +1,15 @@
 <?php
-/*
- * Small helper functions used across the application.
- */
+// Helper functions used on every page.
 
-// Escape output to prevent XSS.
+const MIN_PASSWORD_LENGTH = 8;
+
+// Escape text before printing it in HTML (prevents XSS)
 function e($value): string
 {
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
-// Build a URL relative to the application root.
+// Build a link from the project root, so it works from admin/ and advisor/ too
 function url(string $path = ''): string
 {
     return BASE_URL . ltrim($path, '/');
@@ -21,7 +21,7 @@ function redirect(string $path): void
     exit;
 }
 
-// ---------- Authentication ----------
+// ===== Login and Sessions =====
 
 function is_logged_in(): bool
 {
@@ -38,10 +38,10 @@ function current_user_id(): int
     return (int) ($_SESSION['user']['id'] ?? 0);
 }
 
-function login_user(array $user): void
+// The user details we keep in the session
+function session_user_data(array $user): array
 {
-    session_regenerate_id(true); // prevent session fixation
-    $_SESSION['user'] = [
+    return [
         'id'    => (int) $user['id'],
         'name'  => $user['name'],
         'email' => $user['email'],
@@ -49,7 +49,31 @@ function login_user(array $user): void
     ];
 }
 
-// Where each role lands after logging in.
+function login_user(array $user): void
+{
+    session_regenerate_id(true); // new session ID after login (prevents session fixation)
+    $_SESSION['user'] = session_user_data($user);
+}
+
+// Reload the signed-in user from the database on every request,
+// so a role change or a deleted account takes effect immediately
+function refresh_current_user(PDO $pdo): void
+{
+    if (!is_logged_in()) {
+        return;
+    }
+    $stmt = $pdo->prepare("SELECT id, name, email, role FROM users WHERE id = ?");
+    $stmt->execute([current_user_id()]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($user) {
+        $_SESSION['user'] = session_user_data($user);
+    } else {
+        unset($_SESSION['user']);
+    }
+}
+
+// The page each role sees after signing in
 function home_for_role(string $role): string
 {
     if ($role === 'admin') {
@@ -61,7 +85,7 @@ function home_for_role(string $role): string
     return 'dashboard.php';
 }
 
-// Allow access only to logged-in users with one of the given roles.
+// Only allow signed-in users with one of the given roles
 function require_role(string ...$roles): void
 {
     if (!is_logged_in()) {
@@ -79,7 +103,7 @@ function require_role(string ...$roles): void
     }
 }
 
-// ---------- CSRF protection ----------
+// ===== CSRF Protection =====
 
 function csrf_token(): string
 {
@@ -89,12 +113,13 @@ function csrf_token(): string
     return $_SESSION['csrf_token'];
 }
 
+// Hidden field that goes inside every POST form
 function csrf_field(): string
 {
     return '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
 }
 
-// Call at the start of every POST handler.
+// Call this at the start of every POST handler
 function verify_csrf(): void
 {
     $token = $_POST['csrf_token'] ?? '';
@@ -104,7 +129,7 @@ function verify_csrf(): void
     }
 }
 
-// ---------- Flash messages (shown once after a redirect) ----------
+// ===== Flash Messages (shown once after a redirect) =====
 
 function flash(string $type, string $message): void
 {
@@ -118,7 +143,7 @@ function get_flashes(): array
     return $messages;
 }
 
-// ---------- Proficiency levels ----------
+// ===== Skill Levels and Scores =====
 
 const LEVELS = ['beginner' => 1, 'intermediate' => 2, 'advanced' => 3];
 
@@ -133,7 +158,15 @@ function level_name(int $number): string
     return $names[$number] ?? 'None';
 }
 
-// Read an integer from GET/POST safely.
+// CSS class for the colour of a progress bar
+function score_class(float $score): string
+{
+    if ($score >= 60) return '';
+    if ($score >= 35) return 'mid';
+    return 'low';
+}
+
+// Read a whole number from $_GET or $_POST
 function input_int(array $source, string $key): int
 {
     return isset($source[$key]) ? (int) $source[$key] : 0;

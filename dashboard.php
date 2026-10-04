@@ -2,18 +2,20 @@
 require_once 'includes/init.php';
 require_once 'includes/recommendation.php';
 
-// Advisors and admins have their own dashboards.
+// Advisors and admins have their own dashboards
 if (is_logged_in() && current_user()['role'] !== 'student') {
     redirect(home_for_role(current_user()['role']));
 }
 require_role('student');
 
+// ===== Student Profile and Career Matches =====
 $userId = current_user_id();
 $student = load_student_data($pdo, $userId);
 $completeness = profile_completeness($student);
-$recommendations = get_recommendations($pdo, $userId);
+$recommendations = get_recommendations($pdo, $userId, $student);
 $top = array_slice($recommendations, 0, 3);
 
+// ===== Interview Practice and Advisor Notes =====
 $stmt = $pdo->prepare("SELECT COUNT(*) AS attempts, AVG(score) AS average FROM interview_attempts WHERE user_id = ?");
 $stmt->execute([$userId]);
 $practice = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -26,7 +28,7 @@ $stmt = $pdo->prepare(
 $stmt->execute([$userId]);
 $notes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Most important missing skills for the best match = the next thing to learn.
+// The most important unmet skills for the best match are the next things to learn
 $nextSkills = [];
 if ($top) {
     foreach ($top[0]['skills'] as $s) {

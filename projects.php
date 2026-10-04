@@ -5,7 +5,7 @@ require_role('student');
 $userId = current_user_id();
 $errors = [];
 
-// Load one project that belongs to the current student (or null).
+// Get one project, but only if it belongs to this student (otherwise null)
 function find_own_project(PDO $pdo, int $projectId, int $userId)
 {
     $stmt = $pdo->prepare("SELECT * FROM projects WHERE id = ? AND user_id = ?");
@@ -17,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = $_POST['action'] ?? '';
 
+    // ===== Delete a Project =====
     if ($action === 'delete') {
         $stmt = $pdo->prepare("DELETE FROM projects WHERE id = ? AND user_id = ?");
         $stmt->execute([input_int($_POST, 'id'), $userId]);
@@ -24,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('projects.php');
     }
 
+    // ===== Add or Update a Project =====
     if ($action === 'save') {
         $id = input_int($_POST, 'id');
         $title = trim($_POST['title'] ?? '');
@@ -57,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Which project is being edited (if any)?
+// ===== Project Being Edited =====
 $editing = null;
 if (isset($_GET['edit'])) {
     $editing = find_own_project($pdo, input_int($_GET, 'edit'), $userId);
@@ -68,6 +70,7 @@ if (isset($_GET['edit'])) {
 }
 $form = $errors ? $_POST : ($editing ?? []);
 
+// ===== Student's Projects =====
 $stmt = $pdo->prepare("SELECT * FROM projects WHERE user_id = ? ORDER BY created_at DESC");
 $stmt->execute([$userId]);
 $projects = $stmt->fetchAll(PDO::FETCH_ASSOC);

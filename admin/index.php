@@ -2,7 +2,7 @@
 require_once __DIR__ . '/../includes/init.php';
 require_role('admin');
 
-// Simple counts for the statistics cards.
+// ===== Statistics =====
 $count = fn(string $sql) => (int) $pdo->query($sql)->fetchColumn();
 $stats = [
     'Students'            => $count("SELECT COUNT(*) FROM users WHERE role = 'student'"),
@@ -17,7 +17,8 @@ $stats = [
 
 $recentUsers = $pdo->query("SELECT name, email, role, created_at FROM users ORDER BY created_at DESC, id DESC LIMIT 6")->fetchAll(PDO::FETCH_ASSOC);
 
-// Data quality checks: things that make recommendations or roadmaps weaker.
+// ===== Data Quality Checks =====
+// Missing data that makes recommendations or roadmaps weaker
 $careersWithoutSkills = $pdo->query(
     "SELECT c.id, c.title FROM careers c LEFT JOIN career_skills cs ON cs.career_id = c.id
      WHERE cs.id IS NULL ORDER BY c.title"
@@ -27,7 +28,7 @@ $skillsWithoutCourses = $pdo->query(
      WHERE c.id IS NULL ORDER BY s.name"
 )->fetchAll(PDO::FETCH_COLUMN);
 
-// Most popular skills among students.
+// ===== Most Popular Student Skills =====
 $popularSkills = $pdo->query(
     "SELECT s.name, COUNT(*) AS total FROM student_skills ss JOIN skills s ON s.id = ss.skill_id
      GROUP BY s.id ORDER BY total DESC, s.name LIMIT 8"

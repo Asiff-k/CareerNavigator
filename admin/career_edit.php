@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/init.php';
 require_role('admin');
 
+// ===== Load the Career =====
 $careerId = input_int($_GET, 'id');
 $stmt = $pdo->prepare("SELECT * FROM careers WHERE id = ?");
 $stmt->execute([$careerId]);
@@ -18,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = $_POST['action'] ?? '';
 
+    // ===== Update Career Details =====
     if ($action === 'update') {
         $title = trim($_POST['title'] ?? '');
         $category = trim($_POST['category'] ?? '');
@@ -36,7 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // Add or update a required skill. Level: 1-3, importance: 1-5.
+    // ===== Add or Update a Required Skill =====
+    // Level is 1-3 and importance is 1-5
     if ($action === 'save_skill') {
         $skillId = input_int($_POST, 'skill_id');
         $level = input_int($_POST, 'required_level');
@@ -57,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back . '#skills');
     }
 
+    // ===== Remove a Required Skill =====
     if ($action === 'remove_skill') {
         $pdo->prepare("DELETE FROM career_skills WHERE career_id = ? AND skill_id = ?")
             ->execute([$careerId, input_int($_POST, 'skill_id')]);
@@ -64,6 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($back . '#skills');
     }
 
+    // ===== Link or Unlink a Course =====
     if ($action === 'add_course') {
         $courseId = input_int($_POST, 'course_id');
         $check = $pdo->prepare("SELECT id FROM courses WHERE id = ?");
@@ -85,6 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== Load Data for the Page =====
 $form = $errors ? $_POST : $career;
 
 $stmt = $pdo->prepare(

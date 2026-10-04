@@ -260,25 +260,16 @@ function analyze_career(array $career, array $student): array
 }
 
 // Rank every career for a student, best match first.
-function get_recommendations(PDO $pdo, int $userId): array
+// Pass $student if the page has already loaded it, so it is not loaded twice.
+function get_recommendations(PDO $pdo, int $userId, ?array $student = null): array
 {
-    $student = load_student_data($pdo, $userId);
+    $student = $student ?? load_student_data($pdo, $userId);
     $results = [];
     foreach (load_careers_with_skills($pdo) as $career) {
         $results[] = analyze_career($career, $student);
     }
     usort($results, fn($a, $b) => $b['score'] <=> $a['score']);
     return $results;
-}
-
-// Analysis of a single career, or null if the career does not exist.
-function get_career_analysis(PDO $pdo, int $userId, int $careerId): ?array
-{
-    $careers = load_careers_with_skills($pdo);
-    if (!isset($careers[$careerId])) {
-        return null;
-    }
-    return analyze_career($careers[$careerId], load_student_data($pdo, $userId));
 }
 
 // Courses that teach each of the given skills: [skill_id => [course, ...]]
@@ -304,14 +295,6 @@ function match_label(float $score): string
     if ($score >= 50) return 'Good match';
     if ($score >= 30) return 'Potential match';
     return 'Low match';
-}
-
-// CSS class for the progress bar colour.
-function score_class(float $score): string
-{
-    if ($score >= 60) return '';
-    if ($score >= 35) return 'mid';
-    return 'low';
 }
 
 // How complete a student's profile is (0-100), with tips for what is missing.

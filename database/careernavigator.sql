@@ -394,8 +394,13 @@ CREATE TABLE `users` (
   `password` varchar(255) NOT NULL,
   `role` enum('student','advisor','admin') DEFAULT 'student',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `email_verified_at` datetime DEFAULT NULL,
+  `verification_token_hash` char(64) DEFAULT NULL,
+  `verification_expires_at` datetime DEFAULT NULL,
+  `verification_sent_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `email` (`email`)
+  UNIQUE KEY `email` (`email`),
+  UNIQUE KEY `verification_token_hash` (`verification_token_hash`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -405,7 +410,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` VALUES (1,'System Admin','admin@careernavigator.com','$2y$10$JiN6ysYNySwpoyeuiX.wOuUi5PD.9b/7mgCbqCeEQmtZcv6Y6jzmu','admin','2026-10-03 11:24:47'),(2,'Career Advisor','advisor@careernavigator.com','$2y$10$Bncdp7ER3WBfmRxxHAI/5.FXqClZHVQqB0KdiFKSytdbQggsbON6K','advisor','2026-10-03 11:24:47'),(3,'Demo Student','student@careernavigator.com','$2y$10$7Z7wGm4LR47aHYGGN/4opeAXruNvxV.nzLZAGUIQGU.FYyuPkDaR2','student','2026-10-03 11:24:47');
+INSERT INTO `users` VALUES (1,'System Admin','admin@careernavigator.com','$2y$10$JiN6ysYNySwpoyeuiX.wOuUi5PD.9b/7mgCbqCeEQmtZcv6Y6jzmu','admin','2026-10-03 11:24:47','2026-10-03 11:24:47',NULL,NULL,NULL),(2,'Career Advisor','advisor@careernavigator.com','$2y$10$Bncdp7ER3WBfmRxxHAI/5.FXqClZHVQqB0KdiFKSytdbQggsbON6K','advisor','2026-10-03 11:24:47','2026-10-03 11:24:47',NULL,NULL,NULL),(3,'Demo Student','student@careernavigator.com','$2y$10$7Z7wGm4LR47aHYGGN/4opeAXruNvxV.nzLZAGUIQGU.FYyuPkDaR2','student','2026-10-03 11:24:47','2026-10-03 11:24:47',NULL,NULL,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 

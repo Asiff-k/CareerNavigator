@@ -1,8 +1,7 @@
 <?php
-/*
- * Shared page layout (top part). Set $pageTitle and $activePage before including.
- * The sidebar links depend on the logged-in user's role.
- */
+// Top part of every signed-in page. Set $pageTitle and $activePage before including.
+
+// ===== Sidebar Menu for Each Role =====
 $user = current_user();
 $activePage = $activePage ?? '';
 

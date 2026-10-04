@@ -16,14 +16,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $confirm = $_POST['confirm_password'] ?? '';
 
+    // ===== Form Validation =====
     if ($name === '' || $email === '' || $password === '') {
         $message = 'Please fill in all fields.';
     } elseif (mb_strlen($name) > 100) {
         $message = 'Name must be 100 characters or fewer.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 150) {
         $message = 'Please enter a valid email address.';
-    } elseif (strlen($password) < 6) {
-        $message = 'Password must contain at least 6 characters.';
+    } elseif (strlen($password) < MIN_PASSWORD_LENGTH) {
+        $message = 'Password must contain at least ' . MIN_PASSWORD_LENGTH . ' characters.';
     } elseif ($password !== $confirm) {
         $message = 'The two passwords do not match.';
     } else {
@@ -33,34 +34,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($check->fetch()) {
             $message = 'This email is already registered.';
         } else {
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-
-            // Public registration always creates a student account.
+            // ===== Save User Information =====
+            // Public registration always creates a student account
             $stmt = $pdo->prepare(
                 "INSERT INTO users (name, email, password, role)
                  VALUES (?, ?, ?, 'student')"
             );
-            $stmt->execute([$name, $email, $hashedPassword]);
+            $stmt->execute([$name, $email, password_hash($password, PASSWORD_DEFAULT)]);
+            $newUser = ['id' => (int) $pdo->lastInsertId(), 'name' => $name, 'email' => $email];
 
-            flash('success', 'Account created successfully! Please sign in.');
+            // ===== Send the Verification Email =====
+            // The account cannot sign in until the link in this email is opened
+            if (send_verification_email($pdo, $newUser)) {
+                flash('success', 'Account created! We sent a verification link to ' . $email
+                    . '. Please open it to activate your account, then sign in.');
+            } else {
+                flash('error', 'Your account was created, but we could not send the verification email to '
+                    . $email . '. Please use the "Resend it" link below to try again.');
+            }
+
+            // ===== Redirect After Registration =====
             redirect('login.php');
         }
     }
 }
+
+$pageTitle = 'Create Account';
+require 'includes/auth_header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Account | CareerNavigator</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bricolage+Grotesque:wght@500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body>
-<div class="auth-page">
-    <div class="auth-card">
-        <a href="index.php" class="logo">Career<span>Navigator.</span></a>
         <h1>Join CareerNavigator</h1>
         <p class="muted mb">Create your student account and discover your career path.</p>
 
@@ -82,20 +83,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="form-group">
                 <label for="password">Password</label>
-                <input type="password" id="password" name="password" minlength="6" required>
-                <div class="help">At least 6 characters.</div>
+                <input type="password" id="password" name="password" minlength="<?= MIN_PASSWORD_LENGTH ?>" required>
+                <div class="help">At least <?= MIN_PASSWORD_LENGTH ?> characters.</div>
             </div>
             <div class="form-group">
                 <label for="confirm_password">Confirm Password</label>
-                <input type="password" id="confirm_password" name="confirm_password" minlength="6" required>
+                <input type="password" id="confirm_password" name="confirm_password" minlength="<?= MIN_PASSWORD_LENGTH ?>" required>
             </div>
             <button type="submit" class="btn btn-primary">Create Account</button>
         </form>
 
         <p class="auth-links">Already have an account? <a href="login.php">Sign in</a><br>
             <a href="index.php">&larr; Back to Home</a></p>
-    </div>
-</div>
-<script src="assets/js/app.js"></script>
-</body>
-</html>
+<?php require 'includes/auth_footer.php'; ?>

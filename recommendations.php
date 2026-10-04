@@ -4,10 +4,10 @@ require_once 'includes/recommendation.php';
 require_role('student');
 
 $userId = current_user_id();
-$recommendations = get_recommendations($pdo, $userId);
 $student = load_student_data($pdo, $userId);
+$recommendations = get_recommendations($pdo, $userId, $student);
 
-// Save a snapshot of the current analysis into recommendation_history.
+// ===== Save the Current Analysis to History =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save') {
     verify_csrf();
     if (!$student['skills']) {
@@ -28,7 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save'
     redirect('recommendations.php#history');
 }
 
-// Previous saved runs (latest 5), each with its top 3 careers.
+// ===== Saved History =====
+// The latest 5 saved analyses, each with its top 3 careers
 $stmt = $pdo->prepare(
     "SELECT created_at FROM recommendation_history WHERE user_id = ?
      GROUP BY created_at ORDER BY created_at DESC LIMIT 5"

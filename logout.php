@@ -1,14 +1,9 @@
 <?php
 require_once 'includes/init.php';
 
-// Destroy the session completely, then start a fresh one for the flash message.
+// Clear everything in the session and switch to a new session ID
 $_SESSION = [];
-if (ini_get('session.use_cookies')) {
-    $params = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-}
-session_destroy();
+session_regenerate_id(true);
 
-session_start();
 flash('success', 'You have been signed out.');
 redirect('login.php');

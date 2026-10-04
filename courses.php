@@ -7,7 +7,8 @@ $q = trim($_GET['q'] ?? '');
 $skillFilter = input_int($_GET, 'skill_id');
 $careerFilter = input_int($_GET, 'career_id');
 
-// Build the search query with only the filters that were used.
+// ===== Course Search =====
+// Build the query with only the filters that were used
 $where = [];
 $params = [];
 if ($q !== '') {
@@ -39,7 +40,8 @@ $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $skills = $pdo->query("SELECT id, name FROM skills ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $careerList = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
 
-// Students also get personal suggestions based on the skill gaps of their top 3 careers.
+// ===== Personal Suggestions (students only) =====
+// Based on the skill gaps of the student's top 3 careers
 $recommended = [];
 $gapSkillIds = [];
 if (current_user()['role'] === 'student') {

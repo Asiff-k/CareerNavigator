@@ -10,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $id = input_int($_POST, 'id');
 
-    // Create a new account (used to add advisors and admins).
+    // ===== Create an Account (used to add advisors and admins) =====
     if ($action === 'create') {
         $name = trim($_POST['name'] ?? '');
         $email = trim($_POST['email'] ?? '');
@@ -19,7 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($name === '' || mb_strlen($name) > 100) $errors[] = 'Name is required (maximum 100 characters).';
         if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 150) $errors[] = 'Please enter a valid email address.';
-        if (strlen($password) < 6) $errors[] = 'Password must contain at least 6 characters.';
+        if (strlen($password) < MIN_PASSWORD_LENGTH) $errors[] = 'Password must contain at least ' . MIN_PASSWORD_LENGTH . ' characters.';
         if (!in_array($role, $roles, true)) $errors[] = 'Please choose a valid role.';
 
         if (!$errors) {
@@ -28,7 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($check->fetch()) {
                 $errors[] = 'This email is already registered.';
             } else {
-                $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
+                // Accounts created by an admin are trusted, so they are marked as verified
+                $stmt = $pdo->prepare("INSERT INTO users (name, email, password, role, email_verified_at) VALUES (?, ?, ?, ?, NOW())");
                 $stmt->execute([$name, $email, password_hash($password, PASSWORD_DEFAULT), $role]);
                 flash('success', ucfirst($role) . ' account created for ' . $name . '.');
                 redirect('admin/users.php');
@@ -36,12 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // An admin cannot change or delete their own account here (prevents locking yourself out).
+    // Admins cannot change or delete their own account, so they cannot lock themselves out
     if (($action === 'role' || $action === 'delete') && $id === current_user_id()) {
         flash('error', 'You cannot change or delete your own account.');
         redirect('admin/users.php');
     }
 
+    // ===== Change Role =====
     if ($action === 'role') {
         $role = $_POST['role'] ?? '';
         if (in_array($role, $roles, true)) {
@@ -53,8 +55,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('admin/users.php');
     }
 
+    // ===== Mark Email as Verified =====
+    // For example, when the verification email could not be delivered
+    if ($action === 'verify') {
+        $stmt = $pdo->prepare(
+            "UPDATE users SET email_verified_at = NOW(), verification_token_hash = NULL, verification_expires_at = NULL
+             WHERE id = ? AND email_verified_at IS NULL"
+        );
+        $stmt->execute([$id]);
+        flash('success', $stmt->rowCount() ? 'Email marked as verified.' : 'User not found or already verified.');
+        redirect('admin/users.php');
+    }
+
+    // ===== Delete User =====
+    // The database also deletes the user's profile, skills, projects, history and notes
     if ($action === 'delete') {
-        // Related profile, skills, projects, history and notes are removed by ON DELETE CASCADE.
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$id]);
         flash('success', $stmt->rowCount() ? 'User deleted.' : 'User not found.');
@@ -62,9 +77,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== User List with Search and Role Filter =====
 $roleFilter = in_array($_GET['role'] ?? '', $roles, true) ? $_GET['role'] : '';
 $q = trim($_GET['q'] ?? '');
-$sql = "SELECT id, name, email, role, created_at FROM users WHERE 1 = 1";
+$sql = "SELECT id, name, email, role, created_at, email_verified_at FROM users WHERE 1 = 1";
 $params = [];
 if ($roleFilter) {
     $sql .= " AND role = ?";
@@ -106,7 +122,7 @@ require __DIR__ . '/../includes/header.php';
             <div class="form-group"><label for="email">Email</label>
                 <input type="email" id="email" name="email" maxlength="150" required value="<?= e($_POST['email'] ?? '') ?>"></div>
             <div class="form-group"><label for="password">Temporary password</label>
-                <input type="password" id="password" name="password" minlength="6" required></div>
+                <input type="password" id="password" name="password" minlength="<?= MIN_PASSWORD_LENGTH ?>" required></div>
             <div class="form-group"><label for="role">Role</label>
                 <select id="role" name="role">
                     <?php foreach ($roles as $r): ?>
@@ -143,7 +159,13 @@ require __DIR__ . '/../includes/header.php';
             <?php foreach ($users as $u): ?>
                 <tr>
                     <td><strong><?= e($u['name']) ?></strong></td>
-                    <td><?= e($u['email']) ?></td>
+                    <td><?= e($u['email']) ?>
+                        <div><?php if ($u['email_verified_at']): ?>
+                            <span class="badge badge-green">Verified</span>
+                        <?php else: ?>
+                            <span class="badge badge-amber">Unverified</span>
+                        <?php endif; ?></div>
+                    </td>
                     <td>
                         <?php if ((int) $u['id'] === current_user_id()): ?>
                             <span class="badge badge-dark">Admin (you)</span>
@@ -166,6 +188,14 @@ require __DIR__ . '/../includes/header.php';
                         <div class="btn-group" style="justify-content:flex-end">
                             <?php if ($u['role'] === 'student'): ?>
                                 <a href="../advisor/student.php?id=<?= (int) $u['id'] ?>" class="btn btn-secondary btn-sm">View</a>
+                            <?php endif; ?>
+                            <?php if (!$u['email_verified_at']): ?>
+                                <form method="POST" class="inline-form" data-confirm="Mark this email address as verified without the user clicking the link?">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="action" value="verify">
+                                    <input type="hidden" name="id" value="<?= (int) $u['id'] ?>">
+                                    <button type="submit" class="btn btn-secondary btn-sm">Mark verified</button>
+                                </form>
                             <?php endif; ?>
                             <?php if ((int) $u['id'] !== current_user_id()): ?>
                                 <form method="POST" class="inline-form" data-confirm="Delete this user and all of their data?">

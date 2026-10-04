@@ -5,13 +5,15 @@ require_role('student', 'advisor', 'admin');
 $userId = current_user_id();
 $isStudent = current_user()['role'] === 'student';
 
-// Common words ignored when comparing answers.
+// ===== Answer Scoring =====
+
+// Common words that are ignored when comparing answers
 const STOPWORDS = ['about', 'after', 'also', 'such', 'than', 'that', 'their', 'them', 'then', 'there', 'these', 'they',
     'this', 'those', 'when', 'where', 'which', 'while', 'with', 'what', 'your', 'from', 'have', 'into', 'more', 'most',
     'only', 'other', 'over', 'same', 'should', 'some', 'very', 'will', 'would', 'each', 'every', 'make', 'makes',
     'using', 'used', 'uses', 'does', 'been', 'being', 'were', 'example', 'usually', 'often', 'like', 'just', 'both'];
 
-// Important words of a text: lowercase, 4+ letters, not a stopword, unique.
+// Important words in a text: lowercase, 4+ letters, not a stopword, no duplicates
 function keywords(string $text): array
 {
     preg_match_all('/[a-z][a-z0-9+#\/-]{3,}/', strtolower($text), $m);
@@ -19,8 +21,8 @@ function keywords(string $text): array
 }
 
 // Compare the student's answer with the model answer.
-// A keyword counts as covered if the answer contains it (or a word with the same first 6 letters,
-// so "normalise" matches "normalization").
+// A keyword counts as covered if the answer contains it, or a word with the same first 6 letters
+// (so "normalise" matches "normalization").
 function evaluate_answer(string $answer, string $modelAnswer): array
 {
     $expected = keywords($modelAnswer);
@@ -47,7 +49,7 @@ function evaluate_answer(string $answer, string $modelAnswer): array
     return ['score' => $score, 'matched' => $matched, 'missed' => $missed];
 }
 
-// ---------- Submit a practice answer (students only) ----------
+// ===== Submit a Practice Answer (students only) =====
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     if (!$isStudent) {
@@ -80,7 +82,7 @@ $careers = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll
 $careerId = input_int($_GET, 'career_id');
 $difficulty = in_array($_GET['difficulty'] ?? '', ['easy', 'medium', 'hard'], true) ? $_GET['difficulty'] : '';
 
-// Decide which view to show: result, practice or question bank.
+// ===== Choose What to Show: Result, Practice or Question Bank =====
 $view = 'bank';
 $question = null;
 $attempt = null;
@@ -108,7 +110,7 @@ if ($isStudent && isset($_GET['result'])) {
         );
         $stmt->execute([input_int($_GET, 'question_id')]);
     } else {
-        // Random question for the chosen career, preferring ones not yet practised.
+        // Random question for the chosen career, preferring ones not practised yet
         $sql = "SELECT q.*, c.title AS career_title,
                        (SELECT COUNT(*) FROM interview_attempts a WHERE a.question_id = q.id AND a.user_id = ?) AS times
                 FROM interview_questions q LEFT JOIN careers c ON c.id = q.career_id
@@ -129,7 +131,7 @@ if ($isStudent && isset($_GET['result'])) {
     $question = $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-// Question bank listing
+// ===== Question Bank =====
 if ($view === 'bank') {
     $sql = "SELECT q.*, c.title AS career_title FROM interview_questions q LEFT JOIN careers c ON c.id = q.career_id WHERE 1 = 1";
     $params = [];
@@ -213,7 +215,7 @@ require 'includes/header.php';
             <span class="match-score"><?= (float) $attempt['score'] ?>%</span>
         </div>
         <h2><?= e($attempt['question']) ?></h2>
-        <div class="progress mb"><div class="progress-bar <?= $attempt['score'] >= 60 ? '' : ($attempt['score'] >= 35 ? 'mid' : 'low') ?>" style="width:<?= (float) $attempt['score'] ?>%"></div></div>
+        <div class="progress mb"><div class="progress-bar <?= score_class((float) $attempt['score']) ?>" style="width:<?= (float) $attempt['score'] ?>%"></div></div>
 
         <div class="grid grid-2">
             <div>

@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $id = input_int($_POST, 'id');
 
+    // ===== Add or Update a Skill =====
     if ($action === 'save') {
         $name = trim($_POST['name'] ?? '');
         $category = trim($_POST['category'] ?? '');
@@ -16,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($name === '' || mb_strlen($name) > 100) $errors[] = 'Skill name is required (maximum 100 characters).';
         if (mb_strlen($category) > 100) $errors[] = 'Category must be 100 characters or fewer.';
 
-        // Skill names must be unique.
+        // Skill names must be unique
         $check = $pdo->prepare("SELECT id FROM skills WHERE name = ? AND id <> ?");
         $check->execute([$name, $id]);
         if ($check->fetch()) $errors[] = 'A skill with this name already exists.';
@@ -33,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ===== Delete a Skill =====
     if ($action === 'delete') {
         $stmt = $pdo->prepare("DELETE FROM skills WHERE id = ?");
         $stmt->execute([$id]);
@@ -41,6 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== Skill Being Edited =====
 $editing = null;
 if (isset($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT * FROM skills WHERE id = ?");
@@ -49,6 +52,7 @@ if (isset($_GET['edit'])) {
 }
 $form = $errors ? $_POST : ($editing ?? []);
 
+// ===== Skill List with Usage Counts =====
 $skills = $pdo->query(
     "SELECT s.*,
             (SELECT COUNT(*) FROM career_skills cs WHERE cs.skill_id = s.id) AS career_count,

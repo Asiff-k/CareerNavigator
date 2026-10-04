@@ -4,7 +4,7 @@
  *
  * Run once from the terminal:   C:\xampp\php\php.exe database\seed.php
  *
- * 1. Creates the two extra tables (advisor_notes, interview_attempts).
+ * 1. Creates the two extra tables (advisor_notes, interview_attempts) and adds the email verification columns.
  * 2. Inserts skills, careers, required skills, courses and interview questions.
  * 3. Creates demo admin, advisor and student accounts.
  *
@@ -17,11 +17,12 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../config/db.php';
 
-// ---------- 1. Extra tables ----------
+// ===== 1. Extra tables =====
 $pdo->exec(file_get_contents(__DIR__ . '/schema_additions.sql'));
 echo "Extra tables ready.\n";
+require __DIR__ . '/migrate_email_verification.php';
 
-// ---------- 2. Skills ----------
+// ===== 2. Skills =====
 $skills = [
     ['HTML & CSS', 'Web Development'],
     ['JavaScript', 'Programming'],
@@ -71,7 +72,7 @@ foreach ($pdo->query("SELECT id, name FROM skills") as $row) {
 }
 echo count($skillId) . " skills ready.\n";
 
-// ---------- 3. Careers and required skills ----------
+// ===== 3. Careers and required skills =====
 // Each skill: [skill name, required level (1=beginner, 2=intermediate, 3=advanced), importance (1-5)]
 $careers = [
     [
@@ -218,7 +219,7 @@ foreach ($careers as $c) {
 }
 echo count($careerId) . " careers ready.\n";
 
-// ---------- 4. Courses and certifications ----------
+// ===== 4. Courses and certifications =====
 // [title, provider, description, url, skill name, [career titles]]
 $courses = [
     ['Responsive Web Design Certification', 'freeCodeCamp', 'Free certification covering HTML, CSS, Flexbox, Grid and accessibility through hands-on projects.', 'https://www.freecodecamp.org/learn/2022/responsive-web-design/', 'HTML & CSS', ['Frontend Developer', 'Full Stack Developer', 'UI/UX Designer']],
@@ -278,7 +279,7 @@ foreach ($courses as [$title, $provider, $description, $url, $skillName, $career
 }
 echo count($courses) . " courses ready.\n";
 
-// ---------- 5. Interview questions ----------
+// ===== 5. Interview questions =====
 // [career title or null for general, question, model answer, difficulty]
 $questions = [
     [null, 'Tell me about yourself.', 'Give a short, structured summary: your current studies or role, key skills and achievements, a relevant project, and why you are interested in this position and company.', 'easy'],
@@ -359,14 +360,15 @@ foreach ($questions as [$careerTitle, $question, $answer, $difficulty]) {
 }
 echo count($questions) . " interview questions ready.\n";
 
-// ---------- 6. Demo accounts ----------
+// ===== 6. Demo accounts =====
 $accounts = [
     ['System Admin', 'admin@careernavigator.com', 'admin123', 'admin'],
     ['Career Advisor', 'advisor@careernavigator.com', 'advisor123', 'advisor'],
     ['Demo Student', 'student@careernavigator.com', 'student123', 'student'],
 ];
 $findUser = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-$insertUser = $pdo->prepare("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)");
+// Demo accounts are created already verified so they can sign in straight away.
+$insertUser = $pdo->prepare("INSERT INTO users (name, email, password, role, email_verified_at) VALUES (?, ?, ?, ?, NOW())");
 foreach ($accounts as [$name, $email, $password, $role]) {
     $findUser->execute([$email]);
     if (!$findUser->fetchColumn()) {

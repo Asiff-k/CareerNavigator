@@ -5,30 +5,33 @@ require_role('student');
 
 $userId = current_user_id();
 $careers = load_careers_with_skills($pdo);
+$student = load_student_data($pdo, $userId);
 
-// Use the selected career, or the student's best match by default.
+// ===== Choose the Career =====
+// Use the selected career, or the student's best match by default
 $careerId = input_int($_GET, 'career_id');
 if (!$careerId) {
-    $recommendations = get_recommendations($pdo, $userId);
+    $recommendations = get_recommendations($pdo, $userId, $student);
     $careerId = $recommendations ? (int) $recommendations[0]['career']['id'] : 0;
 }
-$analysis = $careerId ? get_career_analysis($pdo, $userId, $careerId) : null;
+$analysis = isset($careers[$careerId]) ? analyze_career($careers[$careerId], $student) : null;
 
 if (!$analysis && isset($_GET['career_id'])) {
     flash('error', 'Career not found.');
     redirect('roadmap.php');
 }
 
+// ===== Skill Gap, Courses and Interview Progress =====
 if ($analysis) {
     $career = $analysis['career'];
     $missing = array_values(array_filter($analysis['skills'], fn($s) => $s['status'] === 'missing'));
     $improve = array_values(array_filter($analysis['skills'], fn($s) => $s['status'] === 'improve'));
     $notInProjects = array_values(array_filter($analysis['skills'], fn($s) => !$s['in_projects']));
 
-    // Courses for every skill the student still needs.
+    // Courses for every skill the student still needs
     $coursesBySkill = courses_for_skills($pdo, array_column(array_merge($missing, $improve), 'skill_id'));
 
-    // Certifications/courses linked directly to this career.
+    // Courses and certifications linked directly to this career
     $stmt = $pdo->prepare(
         "SELECT c.*, s.name AS skill_name FROM career_courses cc
          JOIN courses c ON c.id = cc.course_id
@@ -38,7 +41,7 @@ if ($analysis) {
     $stmt->execute([$careerId]);
     $careerCourses = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Interview preparation progress for this career.
+    // How many of this career's interview questions the student has practised
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM interview_questions WHERE career_id = ?");
     $stmt->execute([$careerId]);
     $questionCount = (int) $stmt->fetchColumn();
@@ -56,7 +59,7 @@ $pageTitle = 'Skill Gap & Roadmap';
 $activePage = 'roadmap';
 require 'includes/header.php';
 
-// Shows the courses for one skill inside the roadmap.
+// Show up to two courses for one skill inside the roadmap
 function render_skill_courses(array $coursesBySkill, int $skillId): void
 {
     if (empty($coursesBySkill[$skillId])) {

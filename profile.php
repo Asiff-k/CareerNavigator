@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = $_POST['action'] ?? '';
 
-    // ---------- Save academic information ----------
+    // ===== Save Academic Information =====
     if ($action === 'save_profile') {
         $name = trim($_POST['name'] ?? '');
         $university = trim($_POST['university'] ?? '');
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $pdo->prepare("UPDATE users SET name = ? WHERE id = ?")->execute([$name, $userId]);
             $_SESSION['user']['name'] = $name;
 
-            // Insert the profile, or update it if it already exists (user_id is UNIQUE).
+            // Create the profile, or update it if it already exists
             $stmt = $pdo->prepare(
                 "INSERT INTO student_profiles (user_id, university, department, semester, cgpa, interests, bio)
                  VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ---------- Add or update a skill ----------
+    // ===== Add or Update a Skill =====
     if ($action === 'add_skill' || $action === 'update_skill') {
         $skillId = input_int($_POST, 'skill_id');
         $proficiency = $_POST['proficiency'] ?? '';
@@ -74,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    // ---------- Remove a skill ----------
+    // ===== Remove a Skill =====
     if ($action === 'remove_skill') {
         $stmt = $pdo->prepare("DELETE FROM student_skills WHERE user_id = ? AND skill_id = ?");
         $stmt->execute([$userId, input_int($_POST, 'skill_id')]);
@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('profile.php#skills');
     }
 
-    // ---------- Change password ----------
+    // ===== Change Password =====
     if ($action === 'change_password') {
         $current = $_POST['current_password'] ?? '';
         $new = $_POST['new_password'] ?? '';
@@ -94,8 +94,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!password_verify($current, $hash)) {
             $errors[] = 'Your current password is incorrect.';
-        } elseif (strlen($new) < 6) {
-            $errors[] = 'The new password must contain at least 6 characters.';
+        } elseif (strlen($new) < MIN_PASSWORD_LENGTH) {
+            $errors[] = 'The new password must contain at least ' . MIN_PASSWORD_LENGTH . ' characters.';
         } elseif ($new !== $confirm) {
             $errors[] = 'The new passwords do not match.';
         } else {
@@ -107,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ---------- Load data for display ----------
+// ===== Load Data for the Page =====
 $stmt = $pdo->prepare("SELECT * FROM student_profiles WHERE user_id = ?");
 $stmt->execute([$userId]);
 $profile = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
@@ -126,7 +126,7 @@ $stmt->execute([$userId]);
 $mySkills = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $mySkillIds = array_column($mySkills, 'skill_id');
 
-// Skills not yet added, grouped by category for the dropdown.
+// Skills the student has not added yet, grouped by category for the dropdown
 $available = [];
 foreach ($pdo->query("SELECT id, name, category FROM skills ORDER BY category, name") as $s) {
     if (!in_array($s['id'], $mySkillIds)) {
@@ -288,11 +288,11 @@ require 'includes/header.php';
             </div>
             <div class="form-group">
                 <label for="new_password">New password</label>
-                <input type="password" id="new_password" name="new_password" minlength="6" required>
+                <input type="password" id="new_password" name="new_password" minlength="<?= MIN_PASSWORD_LENGTH ?>" required>
             </div>
             <div class="form-group">
                 <label for="confirm_password">Confirm new password</label>
-                <input type="password" id="confirm_password" name="confirm_password" minlength="6" required>
+                <input type="password" id="confirm_password" name="confirm_password" minlength="<?= MIN_PASSWORD_LENGTH ?>" required>
             </div>
         </div>
         <button type="submit" class="btn btn-secondary">Change password</button>

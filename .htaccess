@@ -1,0 +1,6 @@
+# Block web access to Composer packages, Git data and hidden files (.git, .env, .htaccess ...)
+RedirectMatch 403 /vendor(/|$)
+RedirectMatch 403 /\.
+<FilesMatch "^composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>

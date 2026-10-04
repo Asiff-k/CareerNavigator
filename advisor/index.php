@@ -3,6 +3,7 @@ require_once __DIR__ . '/../includes/init.php';
 require_once __DIR__ . '/../includes/recommendation.php';
 require_role('advisor', 'admin');
 
+// ===== Student List with Search =====
 $q = trim($_GET['q'] ?? '');
 
 $sql = "SELECT u.id, u.name, u.email, u.created_at, p.department, p.semester, p.cgpa,
@@ -22,7 +23,7 @@ $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Best career match for each student (calculated live).
+// ===== Best Career Match for Each Student =====
 foreach ($students as &$s) {
     $recs = $s['skill_count'] ? get_recommendations($pdo, (int) $s['id']) : [];
     $s['top'] = $recs[0] ?? null;

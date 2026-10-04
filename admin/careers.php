@@ -8,6 +8,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = $_POST['action'] ?? '';
 
+    // ===== Create a Career =====
     if ($action === 'create') {
         $title = trim($_POST['title'] ?? '');
         $category = trim($_POST['category'] ?? '');
@@ -26,8 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ===== Delete a Career =====
+    // The database also deletes its required skills, course links and saved history
     if ($action === 'delete') {
-        // career_skills, career_courses and recommendation_history rows are removed by ON DELETE CASCADE.
         $stmt = $pdo->prepare("DELETE FROM careers WHERE id = ?");
         $stmt->execute([input_int($_POST, 'id')]);
         flash('success', $stmt->rowCount() ? 'Career deleted.' : 'Career not found.');
@@ -35,6 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== Career List with Counts =====
 $careers = $pdo->query(
     "SELECT c.*,
             (SELECT COUNT(*) FROM career_skills cs WHERE cs.career_id = c.id) AS skill_count,

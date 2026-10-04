@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 
-    // Live character counter for interview answers
+    // Live word counter for interview answers
     var answer = document.getElementById('answer');
     var counter = document.getElementById('answer-count');
     if (answer && counter) {

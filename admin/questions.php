@@ -10,8 +10,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $id = input_int($_POST, 'id');
 
+    // ===== Add or Update a Question =====
     if ($action === 'save') {
-        $careerId = input_int($_POST, 'career_id') ?: null; // empty = general question
+        $careerId = input_int($_POST, 'career_id') ?: null; // empty means a general question
         $question = trim($_POST['question'] ?? '');
         $answer = trim($_POST['answer'] ?? '');
         $difficulty = $_POST['difficulty'] ?? '';
@@ -39,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ===== Delete a Question =====
     if ($action === 'delete') {
         $stmt = $pdo->prepare("DELETE FROM interview_questions WHERE id = ?");
         $stmt->execute([$id]);
@@ -47,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== Question Being Edited =====
 $editing = null;
 if (isset($_GET['edit'])) {
     $stmt = $pdo->prepare("SELECT * FROM interview_questions WHERE id = ?");
@@ -55,6 +58,7 @@ if (isset($_GET['edit'])) {
 }
 $form = $errors ? $_POST : ($editing ?? []);
 
+// ===== Question List with Career Filter =====
 $careers = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
 $careerFilter = input_int($_GET, 'career_id');
 

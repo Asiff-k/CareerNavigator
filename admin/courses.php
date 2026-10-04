@@ -9,6 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $id = input_int($_POST, 'id');
 
+    // ===== Add or Update a Course =====
     if ($action === 'save') {
         $title = trim($_POST['title'] ?? '');
         $provider = trim($_POST['provider'] ?? '');
@@ -38,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$title, $provider, $description, $courseUrl ?: null, $skillId]);
                 $id = (int) $pdo->lastInsertId();
             }
-            // Replace the course's career links with the ticked careers.
+            // Replace the course's career links with the ticked careers
             $pdo->prepare("DELETE FROM career_courses WHERE course_id = ?")->execute([$id]);
             $link = $pdo->prepare("INSERT IGNORE INTO career_courses (career_id, course_id) SELECT id, ? FROM careers WHERE id = ?");
             foreach ($careerIds as $careerId) {
@@ -50,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ===== Delete a Course =====
     if ($action === 'delete') {
         $stmt = $pdo->prepare("DELETE FROM courses WHERE id = ?");
         $stmt->execute([$id]);
@@ -58,6 +60,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== Course Being Edited =====
 $editing = null;
 $editingCareerIds = [];
 if (isset($_GET['edit'])) {
@@ -73,6 +76,7 @@ if (isset($_GET['edit'])) {
 $form = $errors ? $_POST : ($editing ?? []);
 $checkedCareers = $errors ? array_map('intval', (array) ($_POST['career_ids'] ?? [])) : $editingCareerIds;
 
+// ===== Load Data for the Page =====
 $skills = $pdo->query("SELECT id, name FROM skills ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 $careers = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
 $courses = $pdo->query(

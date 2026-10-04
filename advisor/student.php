@@ -5,7 +5,8 @@ require_role('advisor', 'admin');
 
 $studentId = input_int($_GET, 'id');
 
-// Only real student accounts can be viewed here.
+// ===== Load the Student =====
+// Only student accounts can be opened here
 $stmt = $pdo->prepare("SELECT id, name, email, created_at FROM users WHERE id = ? AND role = 'student'");
 $stmt->execute([$studentId]);
 $studentUser = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -19,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verify_csrf();
     $action = $_POST['action'] ?? '';
 
+    // ===== Add a Feedback Note =====
     if ($action === 'add_note') {
         $note = trim($_POST['note'] ?? '');
         if ($note === '' || mb_strlen($note) > 3000) {
@@ -31,8 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // ===== Delete a Feedback Note =====
+    // Advisors can delete only their own notes; admins can delete any note
     if ($action === 'delete_note') {
-        // Advisors may delete only their own notes; admins may delete any note.
         if (current_user()['role'] === 'admin') {
             $stmt = $pdo->prepare("DELETE FROM advisor_notes WHERE id = ? AND student_id = ?");
             $stmt->execute([input_int($_POST, 'note_id'), $studentId]);
@@ -45,10 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// ===== Student Profile, Skills, Projects and Notes =====
 $student = load_student_data($pdo, $studentId);
 $profile = $student['profile'];
 $completeness = profile_completeness($student);
-$recommendations = $student['skills'] ? array_slice(get_recommendations($pdo, $studentId), 0, 5) : [];
+$recommendations = $student['skills'] ? array_slice(get_recommendations($pdo, $studentId, $student), 0, 5) : [];
 
 $stmt = $pdo->prepare(
     "SELECT s.name, s.category, ss.proficiency FROM student_skills ss JOIN skills s ON s.id = ss.skill_id
