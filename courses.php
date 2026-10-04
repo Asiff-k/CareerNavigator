@@ -3,18 +3,34 @@ require_once 'includes/init.php';
 require_once 'includes/recommendation.php';
 require_role('student', 'advisor', 'admin');
 
-$q = trim($_GET['q'] ?? '');
+// Only accept plain text for the search box (e.g. ignore ?q[]=...)
+$q = isset($_GET['q']) && is_string($_GET['q']) ? mb_substr(trim($_GET['q']), 0, 100) : '';
 $skillFilter = input_int($_GET, 'skill_id');
 $careerFilter = input_int($_GET, 'career_id');
+
+$skills = $pdo->query("SELECT id, name FROM skills ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+$careerList = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
+
+// Ignore ids that do not exist, so the dropdowns always show the filter that is really applied
+if (!in_array($skillFilter, array_map('intval', array_column($skills, 'id')), true)) {
+    $skillFilter = 0;
+}
+if (!in_array($careerFilter, array_map('intval', array_column($careerList, 'id')), true)) {
+    $careerFilter = 0;
+}
 
 // ===== Course Search =====
 // Build the query with only the filters that were used
 $where = [];
 $params = [];
 if ($q !== '') {
-    $where[] = "(c.title LIKE ? OR c.provider LIKE ? OR c.description LIKE ?)";
-    $like = '%' . $q . '%';
-    array_push($params, $like, $like, $like);
+    // Every word must appear in the title, provider, description or skill name, in any order.
+    // LIKE is case-insensitive because the tables use a *_ci collation.
+    foreach (array_slice(preg_split('/\s+/', $q), 0, 10) as $word) {
+        $like = '%' . addcslashes($word, '\\%_') . '%'; // treat % and _ as normal characters
+        $where[] = "(c.title LIKE ? OR c.provider LIKE ? OR c.description LIKE ? OR s.name LIKE ?)";
+        array_push($params, $like, $like, $like, $like);
+    }
 }
 if ($skillFilter) {
     $where[] = "c.skill_id = ?";
@@ -36,9 +52,6 @@ $sql = "SELECT c.*, s.name AS skill_name,
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$skills = $pdo->query("SELECT id, name FROM skills ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
-$careerList = $pdo->query("SELECT id, title FROM careers ORDER BY title")->fetchAll(PDO::FETCH_ASSOC);
 
 // ===== Personal Suggestions (students only) =====
 // Based on the skill gaps of the student's top 3 careers
@@ -89,7 +102,7 @@ require 'includes/header.php';
 <form method="GET" class="filters card">
     <div class="form-group">
         <label for="q">Search</label>
-        <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Title, provider or keyword">
+        <input type="search" id="q" name="q" value="<?= e($q) ?>" placeholder="Title, provider or keyword" maxlength="100">
     </div>
     <div class="form-group">
         <label for="skill_id">Skill</label>
@@ -115,10 +128,10 @@ require 'includes/header.php';
     </div>
 </form>
 
-<p class="muted mb"><?= count($courses) ?> course(s) found.</p>
+<p class="muted mb"><?= count($courses) ?> <?= count($courses) === 1 ? 'course' : 'courses' ?> found.</p>
 
 <?php if (!$courses): ?>
-    <div class="card empty">No courses match your filters.</div>
+    <div class="card empty">No courses match your search and filters. Try different keywords or <a href="courses.php">reset the filters</a>.</div>
 <?php endif; ?>
 
 <div class="grid grid-3">
